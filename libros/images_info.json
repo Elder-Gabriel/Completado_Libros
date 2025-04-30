@@ -1,0 +1,11 @@
+[
+  {
+    "type": "cover",
+    "path": "https://via.placeholder.com/1024x1024.png?text=Error+al+generar+imagen"
+  },
+  {
+    "type": "chapter",
+    "chapter_index": 0,
+    "path": "libros\\images\\chapter_0.png"
+  }
+]

@@ -1,0 +1,66 @@
+[
+  {
+    "type": "cover",
+    "path": ".\\images\\cover.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_1.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_2.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_3.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_4.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_5.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_6.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_7.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_8.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_9.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_10.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_11.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_12.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_13.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_14.png"
+  },
+  {
+    "type": "chapter",
+    "path": ".\\images\\chapter_15.png"
+  }
+]
