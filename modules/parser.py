@@ -1,6 +1,6 @@
 import json
 import logging
-from prompts.user_prompt import USER_PROMPT_TEMPLATE
+from modules.user_prompt import USER_PROMPT_TEMPLATE
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

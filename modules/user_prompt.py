@@ -1,5 +1,11 @@
 USER_PROMPT_TEMPLATE = """
-Eres un generador de libros educativos. Crea un libro titulado '{title}' para público {audience}, edades {age_range}, con {pages} páginas. 
+Eres un generador de libros educativos. Crea un libro titulado '{title}' para público {publico}, edades {edad}, con {paginas_deseadas} páginas. 
+El tema principal es: {tema}
+Nivel académico: {nivel_academico}
+Enfoque: {enfoque}
+Formato de lenguaje: {formato_idioma}
+Nivel de profundidad: {profundidad}
+
 Incluye introducción, varios capítulos, ejercicios de repaso y bibliografía.
 
 El libro debe ser informativo, atractivo y adecuado para la edad del público objetivo.
@@ -18,6 +24,13 @@ Devuelve el contenido en formato JSON con la siguiente estructura:
 {{
   "title": "Título del libro",
   "description": "Breve descripción",
+  "tema": "Tema principal del libro",
+  "publico": "Público objetivo",
+  "edad": "Rango de edad",
+  "nivel_academico": "Nivel académico",
+  "enfoque": "Enfoque del libro",
+  "formato_idioma": "Formato del lenguaje",
+  "profundidad": "Nivel de profundidad",
   "toc": {{"Capítulo 1": "página 3", ...}},
   "introduction": "Texto de introducción...",
   "chapters": [
@@ -34,7 +47,10 @@ Devuelve el contenido en formato JSON con la siguiente estructura:
 """
 
 IMAGE_PROMPT_TEMPLATE = """
-Genera una ilustración detallada para un libro educativo titulado '{title}' dirigido a {audience} de {age_range} años.
+Genera una ilustración detallada para un libro educativo titulado '{title}' dirigido a {publico} de {edad} años.
 La imagen debe ilustrar: {description}
-Estilo: Apropiado para niños, colorido, educativo y atractivo visualmente.
+Tema: {tema}
+Nivel académico: {nivel_academico}
+Enfoque: {enfoque}
+Estilo: Apropiado para el público objetivo, colorido, educativo y atractivo visualmente.
 """

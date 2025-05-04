@@ -1,119 +1,260 @@
 import os
+import json
 import logging
-import openai
 import requests
-from io import BytesIO
-from PIL import Image
-from config import OPENAI_API_KEY, IMAGE_SIZE
+import time
+import openai
+from user_prompt import IMAGE_PROMPT_TEMPLATE
 
-# Configurar OpenAI
-openai.api_key = OPENAI_API_KEY
-
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def generate_image(prompt: str, output_path: str = None) -> str:
+def generate_image_prompt(book_params, description):
     """
-    Genera una imagen utilizando DALL-E basada en el prompt.
+    Genera un prompt detallado para la creación de imágenes.
     
     Args:
-        prompt (str): Descripción de la imagen a generar
-        output_path (str, optional): Ruta para guardar la imagen. Si es None, se retorna la URL.
-    
+        book_params (dict): Parámetros del libro
+        description (str): Descripción específica para la imagen
+        
     Returns:
-        str: Ruta local de la imagen guardada o URL de la imagen
+        str: Prompt para generar la imagen
     """
+    # Adaptar el estilo según el público y edad
+    prompt = IMAGE_PROMPT_TEMPLATE.format(
+        title=book_params["title"],
+        publico=book_params["publico"],
+        edad=book_params["edad"],
+        tema=book_params["tema"],
+        nivel_academico=book_params["nivel_academico"],
+        enfoque=book_params["enfoque"],
+        description=description
+    )
+    
+    # Añadir especificaciones técnicas si el tema lo requiere
+    if any(term in book_params["tema"].lower() for term in ["matemáticas", "programación", "ciencia", "física", "química", "biología"]):
+        prompt += "\nEstilo técnico: Incluye diagramas claros, etiquetas precisas y representaciones visuales exactas."
+    
+    # Adaptar estilo según edad
     try:
-        logger.info(f"Generando imagen para prompt: {prompt[:50]}...")
-
-        response = openai.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            n=1,
-            size=IMAGE_SIZE
-        )
-
-        image_url = response.data[0].url
-        logger.info(f"Imagen generada exitosamente: {image_url[:50]}...")
-
-        # Si se proporciona una ruta de salida, descargar y guardar la imagen
-        if output_path:
-            img_response = requests.get(image_url)
-            img = Image.open(BytesIO(img_response.content))
-
-            # Crear directorio si no existe
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-            img.save(output_path)
-            logger.info(f"Imagen guardada en: {output_path}")
-            return output_path
-
-        return image_url
-
-    except Exception as e:
-        logger.error(f"Error al generar imagen: {str(e)}")
-        # En caso de error, crear una imagen de placeholder
-        try:
-            if output_path:
-                # Crear una imagen simple de placeholder
-                placeholder = Image.new('RGB', (1024, 1024), color=(240, 240, 240))
-                placeholder.save(output_path)
-                logger.info(f"Imagen placeholder guardada en: {output_path}")
-                return output_path
-            else:
-                return "https://via.placeholder.com/1024x1024.png?text=Error+al+generar+imagen"
-        except Exception as placeholder_error:
-            logger.error(f"Error al crear imagen placeholder: {str(placeholder_error)}")
-            return ""
-
-def generate_image_prompt(book_params: dict, description: str) -> str:
-    """
-    Genera un prompt para la creación de imágenes basado en los parámetros del libro y una descripción.
+        edad_min = int(book_params["edad"].split("-")[0])
+        if edad_min < 12:
+            prompt += "\nEstilo: Colorido, amigable, con personajes y elementos visuales atractivos para niños."
+        elif edad_min < 18:
+            prompt += "\nEstilo: Moderno, dinámico, con elementos gráficos atractivos para adolescentes."
+        else:
+            prompt += "\nEstilo: Profesional, sobrio, con visualizaciones claras y enfoque en la información."
+    except (ValueError, IndexError):
+        # Si no se puede determinar la edad, usar un estilo neutro
+        prompt += "\nEstilo: Equilibrado entre visual y profesional, adaptado al contenido educativo."
     
-    Args:
-        book_params (dict): Parámetros del libro, como el título y el público objetivo.
-        description (str): Descripción adicional sobre la imagen.
-    
-    Returns:
-        str: El prompt generado para la imagen.
-    """
-    # Combinamos los parámetros del libro con la descripción adicional para generar el prompt
-    prompt = f"{description}. Público objetivo: {book_params['audience']}, Edad recomendada: {book_params['age_range']}, Título del libro: {book_params['title']}"
     return prompt
 
-def generate_book_images(book_content: dict, book_params: dict, output_dir: str = "images") -> list:
+def generate_images_dalle(prompts, images_dir, quality="standard"):
+    """
+    Genera imágenes utilizando DALL-E de OpenAI.
+    
+    Args:
+        prompts (list): Lista de prompts para generar imágenes
+        images_dir (str): Directorio donde guardar las imágenes
+        quality (str): Calidad de las imágenes ('standard' o 'hd')
+        
+    Returns:
+        list: Información sobre las imágenes generadas
+    """
+    image_info = []
+    
+    try:
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            raise ValueError("No se encontró la clave API de OpenAI en las variables de entorno")
+        
+        client = openai.OpenAI(api_key=api_key)
+        
+        for i, prompt in enumerate(prompts):
+            try:
+                logger.info(f"🎨 Generando imagen {i+1}/{len(prompts)}")
+                
+                response = client.images.generate(
+                    model="dall-e-3",  # Usar el modelo más avanzado disponible
+                    prompt=prompt,
+                    size="1024x1024",
+                    quality=quality,
+                    n=1,
+                )
+                
+                image_url = response.data[0].url
+                
+                # Descargar la imagen
+                image_path = os.path.join(images_dir, f"image_{i+1}.png")
+                os.makedirs(os.path.dirname(image_path), exist_ok=True)
+                
+                response = requests.get(image_url)
+                with open(image_path, "wb") as f:
+                    f.write(response.content)
+                
+                # Registrar información de la imagen
+                image_info.append({
+                    "path": image_path,
+                    "prompt": prompt,
+                    "description": f"Imagen {i+1} para el libro"
+                })
+                
+                logger.info(f"✅ Imagen {i+1} guardada en: {image_path}")
+                
+                # Esperar un poco entre solicitudes para evitar límites de tasa
+                time.sleep(2)
+                
+            except Exception as e:
+                logger.error(f"❌ Error al generar imagen {i+1}: {str(e)}")
+                continue
+    
+    except Exception as e:
+        logger.exception(f"❌ Error general en la generación de imágenes: {str(e)}")
+    
+    return image_info
+
+def generate_images_fallback(descriptions, images_dir):
+    """
+    Método alternativo para obtener imágenes cuando no se puede usar DALL-E.
+    Usa imágenes de placeholder o imágenes libres de derechos.
+    
+    Args:
+        descriptions (list): Lista de descripciones para las imágenes
+        images_dir (str): Directorio donde guardar las imágenes
+        
+    Returns:
+        list: Información sobre las imágenes generadas
+    """
+    image_info = []
+    
+    try:
+        # URLs de algunas imágenes de placeholder
+        placeholder_urls = [
+            "https://via.placeholder.com/800x600.png?text=Imagen+Educativa+1",
+            "https://via.placeholder.com/800x600.png?text=Imagen+Educativa+2",
+            "https://via.placeholder.com/800x600.png?text=Imagen+Educativa+3",
+            "https://via.placeholder.com/800x600.png?text=Imagen+Educativa+4",
+            "https://via.placeholder.com/800x600.png?text=Imagen+Educativa+5"
+        ]
+        
+        # Usar solo la cantidad necesaria de URLs
+        urls_to_use = placeholder_urls[:min(len(descriptions), len(placeholder_urls))]
+        
+        for i, (url, desc) in enumerate(zip(urls_to_use, descriptions)):
+            try:
+                # Descargar la imagen
+                image_path = os.path.join(images_dir, f"image_{i+1}.png")
+                os.makedirs(os.path.dirname(image_path), exist_ok=True)
+                
+                response = requests.get(url)
+                with open(image_path, "wb") as f:
+                    f.write(response.content)
+                
+                # Registrar información de la imagen
+                image_info.append({
+                    "path": image_path,
+                    "description": desc
+                })
+                
+                logger.info(f"✅ Imagen placeholder {i+1} guardada en: {image_path}")
+                
+            except Exception as e:
+                logger.error(f"❌ Error al descargar imagen placeholder {i+1}: {str(e)}")
+                continue
+    
+    except Exception as e:
+        logger.exception(f"❌ Error general en la generación de imágenes fallback: {str(e)}")
+    
+    return image_info
+
+def generate_book_images(book_content, book_params, images_dir):
     """
     Genera imágenes para el libro basado en su contenido.
     
     Args:
-        book_content (dict): Contenido estructurado del libro
+        book_content (dict): Contenido del libro en formato JSON
         book_params (dict): Parámetros del libro
-        output_dir (str): Directorio para guardar las imágenes
-    
+        images_dir (str): Directorio donde guardar las imágenes
+        
     Returns:
-        list: Lista de rutas de imágenes generadas
+        dict: Información sobre las imágenes generadas, organizada por capítulos
     """
-    # Crear directorio de imágenes si no existe
-    os.makedirs(output_dir, exist_ok=True)
-
-    image_paths = []
-
-    # Imagen para portada
-    cover_prompt = generate_image_prompt(
-        book_params,
-        f"Portada ilustrativa para '{book_params['title']}'. Estilo artístico, colorido y educativo."
-    )
-    cover_path = os.path.join(output_dir, "cover.png")
-    cover_image = generate_image(cover_prompt, cover_path)
-    image_paths.append({"type": "cover", "path": cover_image})
-
-    # Imágenes para cada capítulo
-    chapters = book_content.get("chapters", [])
-    for i, chapter in enumerate(chapters):
-        chapter_title = chapter.get("title", f"Capítulo {i + 1}")
-        chapter_prompt = generate_image_prompt(book_params, f"Ilustración para el capítulo: {chapter_title}")
-        chapter_path = os.path.join(output_dir, f"chapter_{i + 1}.png")
-        chapter_image = generate_image(chapter_prompt, chapter_path)
-        image_paths.append({"type": "chapter", "path": chapter_image})
-
-    return image_paths
+    try:
+        os.makedirs(images_dir, exist_ok=True)
+        logger.info(f"📁 Directorio de imágenes creado: {images_dir}")
+        
+        images_info = {}
+        
+        # Generar imagen de portada
+        cover_prompt = generate_image_prompt(
+            book_params, 
+            f"Portada del libro '{book_content['title']}'. Representación visual del tema principal: {book_params['tema']}"
+        )
+        cover_prompts = [cover_prompt]
+        
+        # Generar prompts para imágenes de capítulos
+        chapter_prompts = []
+        chapter_descriptions = []
+        
+        for i, chapter in enumerate(book_content["chapters"], 1):
+            # Extraer conceptos clave del capítulo
+            chapter_text = chapter["content"]
+            chapter_title = chapter["title"]
+            
+            # Limitar a 500 caracteres para el prompt
+            short_content = chapter_text[:500] + "..." if len(chapter_text) > 500 else chapter_text
+            
+            # Crear un prompt específico para este capítulo
+            chapter_prompt = generate_image_prompt(
+                book_params,
+                f"Ilustración para el capítulo '{chapter_title}'. Contenido: {short_content}"
+            )
+            
+            chapter_prompts.append(chapter_prompt)
+            chapter_descriptions.append(f"Ilustración del capítulo: {chapter_title}")
+        
+        # Intentar generar imágenes con DALL-E
+        try:
+            # Primero la portada
+            cover_images = generate_images_dalle(cover_prompts, images_dir, quality="hd")
+            if cover_images:
+                images_info["cover"] = cover_images
+            
+            # Luego los capítulos
+            chapter_images = generate_images_dalle(chapter_prompts, images_dir)
+            
+            # Organizar las imágenes por capítulos
+            for i, img_info in enumerate(chapter_images):
+                chapter_key = f"chapter_{i+1}"
+                if chapter_key not in images_info:
+                    images_info[chapter_key] = []
+                images_info[chapter_key].append(img_info)
+        
+        except Exception as e:
+            logger.warning(f"⚠️ No se pudieron generar imágenes con DALL-E: {str(e)}")
+            logger.info("🔄 Usando método alternativo para obtener imágenes...")
+            
+            # Si falla DALL-E, usar imágenes de placeholder
+            all_descriptions = ["Portada del libro"] + chapter_descriptions
+            all_images = generate_images_fallback(all_descriptions, images_dir)
+            
+            # Asignar imágenes a capítulos
+            if all_images:
+                # Portada
+                if len(all_images) > 0:
+                    images_info["cover"] = [all_images[0]]
+                
+                # Capítulos
+                for i, img_info in enumerate(all_images[1:], 1):
+                    chapter_key = f"chapter_{i}"
+                    if chapter_key not in images_info:
+                        images_info[chapter_key] = []
+                    images_info[chapter_key].append(img_info)
+        
+        logger.info(f"🖼️ Total de imágenes generadas: {sum(len(imgs) for imgs in images_info.values())}")
+        return images_info
+    
+    except Exception as e:
+        logger.exception(f"❌ Error general en la generación de imágenes: {str(e)}")
+        # Devolver un diccionario vacío en caso de error
+        return {}
